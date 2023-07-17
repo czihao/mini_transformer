@@ -1,25 +1,35 @@
 import torch
+import numpy as np
 import torch.nn as nn
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
+torch.manual_seed(0)
+torch.use_deterministic_algorithms(True)
 
-num_neurons = 3
+num_neurons = 100
 num_pattern = 10
-patterns = torch.rand((num_pattern, num_neurons))
+patterns = 2*torch.rand((num_pattern, num_neurons))-1
+patterns = torch.where(patterns > 0, float(1),float(-1))
 
 class hpf(nn.Module):
     def __init__(self):
         super().__init__()
-        self.x = nn.Parameter(2*torch.rand((num_neurons, 1), requires_grad=False)-1)
-        self.Q = 2*torch.rand((num_neurons, num_neurons))-1
-        # for i, pattern in enumerate(patterns):
-        #     if i == 0:
-        #         self.Q = torch.outer(pattern, pattern)
-        #     else:
-        #         self.Q += torch.outer(pattern, pattern)
-        # self.Q /= num_pattern
+        self.x = nn.Parameter(2*torch.rand((num_neurons, 1), requires_grad=True)-1)
+        ##### zero activation #####
+        # self.x.data = torch.where(self.x.data > 0, float(1), float(-1))
+        ##### tanh #####
+        self.x.data = F.tanh(self.x.data)
+        # self.Q = 2*torch.rand((num_neurons, num_neurons))-1
+        for i, pattern in enumerate(patterns):
+            if i == 0:
+                self.Q = torch.outer(pattern, pattern)
+            else:
+                self.Q += torch.outer(pattern, pattern)
+        self.Q /= num_pattern
+        # self.Q.fill_diagonal_(0)
     
     def forward(self, x=None):
-        return -self.x.T @ self.Q @ self.x
+        return -0.5* self.x.T @ self.Q @ self.x
     
 
 
@@ -48,16 +58,30 @@ class hpf_opt(torch.optim.Optimizer):
 # y = x.T @ Q @ x
 
 quad = hpf()
-# opt = torch.optim.Adam(quad.parameters(), lr=1e-3)
+opt = torch.optim.Adam(quad.parameters(), lr=1e-3)
 
 loss = []
-for i in range(10000):
-    quad.x.data = quad.Q @ quad.x.data
-    quad.x.data = torch.where(quad.x.data > 0, float(1), float(-1))
+for i in range(2000):
     y = quad()
     loss.append(y.item())
-    if i % 1000 == 0:
+    if i % 100 == 0:
         print(i, y.item())
+    idx = torch.randint(0, num_neurons, (1, ))
+    # grad = torch.zeros_like(quad.x.data)
+    # grad[idx] = quad.Q[idx, :] @ quad.x.data
+    # y.backword(grad)
+    quad.x.data[idx] = quad.Q[idx, :] @ quad.x.data
+    ##### zero activation #####
+    # quad.x.data[idx] = torch.where(quad.x.data[idx] > 0, float(1), float(-1))
+    ##### tanh #####
+    quad.x.data[idx] = F.tanh(quad.x.data[idx])
+    
+    if i % 100 == 0:
+        pattern = 2*torch.rand((num_neurons))-1
+        pattern = torch.where(pattern > 0, float(1),float(-1))
+        # num_pattern += 1
+        quad.Q = (num_pattern-1)/num_pattern * quad.Q + 1/num_pattern * torch.outer(pattern, pattern)
+    
 
 
 fig = plt.figure()

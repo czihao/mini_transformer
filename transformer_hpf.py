@@ -77,7 +77,7 @@ class AttnHead(nn.Module):
         query = self.query(token).reshape(N, B, num_heads, head_size//num_heads).transpose(-2, -3)
         value = self.value(token).reshape(N, B, num_heads, head_size//num_heads).transpose(-2, -3)
         w = key @ query.transpose(-2, -1) * head_size**-.5
-        w = w.masked_fill(self.mask[:,:,:B, :B], float('-inf'))
+        w = w.masked_fill(self.mask[:,:,:B,:B], float('-inf'))
         w = F.softmax(w, dim=-1, dtype=torch.float32)
         out = w @ value
         out = out.transpose(1, 2).reshape(N, B, R)
