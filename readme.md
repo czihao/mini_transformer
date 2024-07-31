@@ -1,4 +1,4 @@
-# Project Title
+# MINI TRANSFORMER
 
 A simple decoder-only transformer that learns to speak Shakespear (not really)
 
